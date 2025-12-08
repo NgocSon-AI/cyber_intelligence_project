@@ -1,1 +1,0 @@
-# Lên lịch quét 2 tiếng
