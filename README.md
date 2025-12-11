@@ -32,6 +32,7 @@ python -m src.main
 
 ## 📁 Cấu trúc thư mục
 
+```bash
 src/
 │── web_crawler/
 | │── sites/
@@ -40,3 +41,4 @@ src/
 │── alerts/
 │── storage/
 │── main.py
+```
