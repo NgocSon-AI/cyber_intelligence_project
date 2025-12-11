@@ -9,3 +9,6 @@ APScheduler==3.10.4
 tldextract==5.1.2
 regex==2024.11.6
 emoji==2.14.0
+requests
+# beautifulsoup4
+schedule

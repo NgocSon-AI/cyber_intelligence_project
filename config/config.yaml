@@ -1,0 +1,18 @@
+# ==============================
+# Data Monitoring Settings
+# ==============================
+
+scan_interval_hours: 3
+
+web_sources:
+  - "https://example.com/data-leak"
+
+telegram_sources:
+  - "https://web.telegram.org/k/#@Cyber_Ti_Reports_VN"
+
+database:
+  path: "data.db"
+
+telegram_alert:
+  bot_token: ""
+  chat_id: ""
