@@ -1,80 +1,46 @@
-# from src.detectors.rules_detector import DataLeakDetector
+# src/main.py
+"""
+Main entry point for the Cyber Intelligence Project.
 
-# detector = DataLeakDetector()
+This module provides the application entry point that initializes
+and runs the cyber intelligence workflow for detecting data leaks.
+"""
 
-# post = """
-#     Bán data khách hàng Việt Nam, full info gồm: tên, sđt, email.
-#     Có 100k records, giá rẻ, liên hệ Telegram @abcxyz
-# """
-
-# result = detector.detect(post)
-
-# print(result)
-import os
-from src.storage.db_handler import init_database, save_post
-from src.web_crawler.core.base_crawler import BaseCrawler
-from src.web_crawler.sites.leakbase_adapter import LeakBaseAdapter
-from src.detectors.rules_detector import DataLeakDetector
-from src.alerts.telegram_bot import TelegramAlert
+import asyncio
 from dotenv import load_dotenv
-from typing import cast
-load_dotenv()
+
+from src.utils.logger import get_logger
+from src.utils.exception import MonitoringError
+from src.core.workflow import CyberIntelligenceApp
+
+logger = get_logger(__name__)
 
 
-TELEGRAM_BOT_TOKEN = cast(str, os.getenv("TELEGRAM_BOT_TOKEN"))
-TELEGRAM_CHAT_ID = cast(str, os.getenv("TELEGRAM_CHAT_ID"))
-
-if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
-    raise ValueError("Vui lòng thiết lập TELEGRAM_BOT_TOKEN và TELEGRAM_CHAT_ID trong .env")
-
-def check_posts_for_leak(posts):
+async def main():
     """
-    Chạy DataLeakDetector cho danh sách posts.
-    
-    Args:
-        posts (list[dict]): list các bài post, mỗi post có các trường như title, content, link, author,...
-    
-    Returns:
-        list[dict]: danh sách post đã được gắn kết quả detect_result
+    Main entry point for the cyber intelligence application.
+
+    Supports both CSV processing and live crawling modes.
+    Configuration is controlled via environment variables and config files.
     """
-    detector = DataLeakDetector()
-    checked_posts = []
+    # Load environment variables
+    load_dotenv()
 
-    for post in posts:
-        # Kết hợp title + content để kiểm tra
-        text_to_check = f"{post.get('title','')} {post.get('content','')}"
-        
-        # Chạy detect
-        result = detector.detect(text_to_check)
-        
-        # Gộp post gốc + kết quả detect
-        post_with_detect = {**post, "detect_result": result}
-        checked_posts.append(post_with_detect)
+    # Configuration: Set to False to enable live crawling
+    use_csv_mode = False
+    # Configuration: Set to True to save crawled posts to CSV
+    save_csv_mode = True
 
-    return checked_posts
-
-def main():
-    crawler = BaseCrawler(adapter=LeakBaseAdapter(), headless=False)
-    results = crawler.crawl()
-    
-    # Chạy check tất cả bài post
-    check_results = check_posts_for_leak(results)
-
-    # Lọc ra các post rủi ro (LEAK)
-    leak_posts = [post for post in check_results if post["detect_result"]["label"] == "LEAK"]
-
-    # print(f"Tổng bài: {len(check_results)}, Bài rủi ro: {len(leak_posts)}")
-    # for post in leak_posts:
-    #     print(post["title"], post["detect_result"]["score"])
-
-    init_database()
-    for post in leak_posts:
-        save_post(post)
-
-    bot = TelegramAlert(bot_token=TELEGRAM_BOT_TOKEN, chat_id=TELEGRAM_CHAT_ID)
-    for post in leak_posts:
-        bot.send(post)
+    try:
+        app = CyberIntelligenceApp(use_csv=use_csv_mode, save_csv=save_csv_mode)
+        await app.run()
+    except MonitoringError as e:
+        logger.error(f"Application error: {e}")
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}")
+        raise
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

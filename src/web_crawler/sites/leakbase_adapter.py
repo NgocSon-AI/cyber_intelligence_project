@@ -1,84 +1,136 @@
 # sites/leakbase_adapter.py
 """
 LeakBase adapter: defines selectors and parsing logic for leakbase.la
+
+This module provides a site-specific adapter for crawling LeakBase forum posts.
+It implements the BaseAdapter interface to extract post information from the
+LeakBase website using Playwright for browser automation.
+
+Classes:
+    LeakBaseAdapter: Adapter for parsing LeakBase forum content
 """
 
-from typing import List, Dict
-from selenium.webdriver.common.by import By
+from typing import List, Dict, Optional
+from urllib.parse import urljoin
 from src.web_crawler.core.base_adapter import BaseAdapter
+from src.utils.configs import Config
 
 
 class LeakBaseAdapter(BaseAdapter):
-    BASE_URL = "https://leakbase.la/"
+    """
+    Adapter for crawling and parsing posts from LeakBase forum.
 
-    def get_post_elements(self, driver) -> List:
-        """Return list of <li> post items on homepage."""
-        return driver.find_elements(By.CSS_SELECTOR, "li._xgtIstatistik-satir")
+    This adapter handles the specific HTML structure and selectors used by
+    the LeakBase website to extract forum post information including titles,
+    authors, content, and metadata.
 
-    def parse_post(self, post_element, driver) -> Dict:
-        """Parse one post block and return structured info."""
-        konu = post_element.find_element(By.CSS_SELECTOR, "._xgtIstatistik-satir--konu")
+    Attributes:
+        BASE_URL (str): The base URL of the LeakBase forum
+        LIST_ITEM_SELECTOR (str): CSS selector for post list items
+        TITLE_SELECTOR (str): CSS selector for post titles
+        CONTENT_SELECTOR (str): CSS selector for post content
+        AUTHOR_SELECTOR (str): CSS selector for post authors
+    """
 
-        # Author
-        author = konu.get_attribute("data-author")
+    # Configuration from centralized config
+    BASE_URL: str = Config.LeakBase.BASE_URL
+    LIST_ITEM_SELECTOR: str = Config.LeakBase.LIST_ITEM_SELECTOR
+    TITLE_SELECTOR: str = Config.LeakBase.TITLE_SELECTOR
+    CONTENT_SELECTOR: str = Config.LeakBase.CONTENT_SELECTOR
+    AUTHOR_SELECTOR: str = Config.LeakBase.AUTHOR_SELECTOR
+    THREAD_URL_PATTERN: str = Config.LeakBase.THREAD_URL_PATTERN
+    LISTING_LOAD_TIMEOUT: int = Config.LeakBase.LISTING_LOAD_TIMEOUT
 
-        # 2 links inside the block (1 = google link, 2 = real post link)
-        a_tags = konu.find_elements(By.TAG_NAME, "a")
-        title = a_tags[1].text.strip()
-        link = a_tags[1].get_attribute("href")
+    async def wait_listing_loaded(self, page) -> None:
+        """
+        Wait for the post listing page to fully load.
 
-        # # Type (prefix)
-        # try:
-        #     post_type = post_element.find_element(
-        #         By.CSS_SELECTOR, ".prefix-arbitors"
-        #     ).text.strip()
-        # except:
-        #     post_type = "unknown"
+        This method ensures that the dynamic content on the listing page
+        has been rendered before attempting to extract post links.
 
-        # # Category
-        # forum = post_element.find_element(
-        #     By.CSS_SELECTOR, "._xgtIstatistik-satir--forum a"
-        # ).text.strip()
+        Args:
+            page: Playwright page object
 
-        # # Stats
-        # replies = post_element.find_element(
-        #     By.CSS_SELECTOR, "._xgtIstatistik-satir--cevap"
-        # ).text.strip()
+        Raises:
+            TimeoutError: If the listing doesn't load within the timeout period
+        """
+        try:
+            await page.wait_for_selector(self.LIST_ITEM_SELECTOR, timeout=self.LISTING_LOAD_TIMEOUT)
+        except Exception as e:
+            raise TimeoutError(f"Failed to load post listing: {e}") from e
 
-        # views = post_element.find_element(
-        #     By.CSS_SELECTOR, "._xgtIstatistik-satir--goruntuleme"
-        # ).text.strip()
+    async def get_post_links(self, page) -> List[str]:
+        """
+        Extract all post links from the current listing page.
 
-        # Last reply author
-        # last_author = post_element.find_element(
-        #     By.CSS_SELECTOR, "._xgtIstatistik-satir--sonYazan a.username"
-        # ).text.strip()
+        This method finds all anchor tags within post list items that contain
+        thread links and returns them as a deduplicated list.
 
-        time_str = post_element.find_element(
-            By.CSS_SELECTOR, "._xgtIstatistik-satir--zaman time"
-        ).get_attribute("datetime")
+        Args:
+            page: Playwright page object
 
-        # -------------------------
-        # Load content
-        # -------------------------
-        driver.execute_script(f"window.open('{link}', '_blank')")
-        driver.switch_to.window(driver.window_handles[-1])
+        Returns:
+            List of unique post URLs as strings
+        """
+        links = set()
 
         try:
-            content = driver.find_element(
-                By.CSS_SELECTOR, ".message-body .bbWrapper"
-            ).text.strip()
-        except:
-            content = ""
+            # Find all anchor tags within post list items
+            items = await page.query_selector_all(f"{self.LIST_ITEM_SELECTOR} a")
 
-        driver.close()
-        driver.switch_to.window(driver.window_handles[0])
+            for anchor in items:
+                href = await anchor.get_attribute("href")
+                if href and self.THREAD_URL_PATTERN in href:
+                    # Convert relative URLs to absolute URLs
+                    full_url = urljoin(self.BASE_URL, href)
+                    links.add(full_url)
+
+        except Exception as e:
+            print(f"[WARNING] Error extracting post links: {e}")
+
+        return list(links)
+
+    async def parse_detail(self, page) -> Dict[str, Optional[str]]:
+        """
+        Parse detailed information from a single post page.
+
+        This method extracts the title, content, and other metadata from
+        a specific forum post page.
+
+        Args:
+            page: Playwright page object for the post detail page
+
+        Returns:
+            Dictionary containing parsed post information:
+            - title: Post title
+            - content: Post content text
+            - author: Post author (if available)
+        """
+        try:
+            # Extract title
+            title_element = await page.query_selector(self.TITLE_SELECTOR)
+            title = await title_element.text_content() if title_element else ""
+            title = title.strip() if title else ""
+
+            # Extract content
+            content_element = await page.query_selector(self.CONTENT_SELECTOR)
+            content = await content_element.text_content() if content_element else ""
+            content = content.strip() if content else ""
+
+            # Extract author (selector may need adjustment based on actual HTML)
+            author_element = await page.query_selector(self.AUTHOR_SELECTOR)
+            author = (await author_element.get_attribute("data-author")
+                     if author_element else None)
+            author = author.strip() if author else None
+
+        except Exception as e:
+            print(f"[WARNING] Error parsing post detail: {e}")
+            title = ""
+            content = ""
+            author = None
 
         return {
             "title": title,
-            "link": link,
-            "author": author,
-            "time": time_str,
             "content": content,
-            "source": "leakbase.la",
+            "author": author,
         }

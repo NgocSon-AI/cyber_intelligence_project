@@ -208,3 +208,7 @@ __marimo__/
 chromedriver-linux64
 chromedriver-linux64.zip
 crawler.db
+
+
+tests/
+tests
