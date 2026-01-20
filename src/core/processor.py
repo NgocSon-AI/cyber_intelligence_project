@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 
 from src.utils.logger import get_logger
 from src.utils.exception import DetectionError, DatabaseError, AlertError
-from src.detectors.rules_detector import DataLeakDetector
+from src.detectors.rules_detector import VietnamRelevanceDetector
 from src.storage.db_handler import init_database, save_post
 from src.alerts.telegram_bot import TelegramAlert
 
@@ -34,7 +34,7 @@ class DataProcessor:
             chat_id: Telegram chat ID for alerts
         """
         self.logger = logger
-        self.detector = DataLeakDetector()
+        self.detector = VietnamRelevanceDetector()
         self.bot = TelegramAlert(bot_token=bot_token, chat_id=chat_id)
 
     def detect_data_leaks(self, posts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

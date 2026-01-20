@@ -59,36 +59,56 @@ class LeakBaseAdapter(BaseAdapter):
         except Exception as e:
             raise TimeoutError(f"Failed to load post listing: {e}") from e
 
+    # async def get_post_links(self, page) -> List[str]:
+    #     """
+    #     Extract all post links from the current listing page.
+
+    #     This method finds all anchor tags within post list items that contain
+    #     thread links and returns them as a deduplicated list.
+
+    #     Args:
+    #         page: Playwright page object
+
+    #     Returns:
+    #         List of unique post URLs as strings
+    #     """
+    #     links = set()
+
+    #     try:
+    #         # Find all anchor tags within post list items
+    #         items = await page.query_selector_all(f"{self.LIST_ITEM_SELECTOR} a")
+
+    #         for anchor in items:
+    #             href = await anchor.get_attribute("href")
+    #             if href and self.THREAD_URL_PATTERN in href:
+    #                 # Convert relative URLs to absolute URLs
+    #                 full_url = urljoin(self.BASE_URL, href)
+    #                 links.add(full_url)
+
+    #     except Exception as e:
+    #         print(f"[WARNING] Error extracting post links: {e}")
+
+    #     return list(links)
+
     async def get_post_links(self, page) -> List[str]:
-        """
-        Extract all post links from the current listing page.
-
-        This method finds all anchor tags within post list items that contain
-        thread links and returns them as a deduplicated list.
-
-        Args:
-            page: Playwright page object
-
-        Returns:
-            List of unique post URLs as strings
-        """
         links = set()
-
         try:
-            # Find all anchor tags within post list items
             items = await page.query_selector_all(f"{self.LIST_ITEM_SELECTOR} a")
-
             for anchor in items:
                 href = await anchor.get_attribute("href")
                 if href and self.THREAD_URL_PATTERN in href:
-                    # Convert relative URLs to absolute URLs
                     full_url = urljoin(self.BASE_URL, href)
+                    
+                    if full_url.endswith('/latest'):
+                        full_url = full_url[:-7]
+                        if not full_url.endswith('/'):
+                            full_url += '/'
                     links.add(full_url)
-
         except Exception as e:
             print(f"[WARNING] Error extracting post links: {e}")
-
         return list(links)
+
+
 
     async def parse_detail(self, page) -> Dict[str, Optional[str]]:
         """

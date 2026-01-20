@@ -36,7 +36,7 @@ class CyberIntelligenceApp:
         save_csv: Whether to save crawled posts to CSV file
     """
 
-    def __init__(self, use_csv: bool = True, save_csv: bool = False):
+    def __init__(self, use_csv: bool = True, save_csv: bool = False, mode: str = "leakbase"):
         """
         Initialize the cyber intelligence application.
 
@@ -50,6 +50,7 @@ class CyberIntelligenceApp:
         self.use_csv = use_csv
         self.save_csv = save_csv
         self.logger = logger
+        self.mode = mode
 
         # Validate configuration
         bot_token = Config.TELEGRAM_BOT_TOKEN
@@ -84,7 +85,7 @@ class CyberIntelligenceApp:
             self.logger.info("Starting Cyber Intelligence workflow")
 
             # Step 1: Load posts
-            posts = await self.data_loader.load_posts(self.use_csv)
+            posts = await self.data_loader.load_posts(self.use_csv, csv_path=str(Config.OUTPUT_PATH), mode=self.mode)
 
             if not posts:
                 self.logger.warning("No posts to process")
@@ -92,10 +93,7 @@ class CyberIntelligenceApp:
 
             # Step 2: Save to CSV if requested and crawling was performed
             if self.save_csv and not self.use_csv:
-                csv_path = os.path.join(
-                    os.path.dirname(os.path.dirname(__file__)),
-                    Config.OUTPUT_FILE
-                )
+                csv_path = Config.OUTPUT_FILE
                 self.data_loader.save_posts_to_csv(posts, csv_path)
                 self.logger.info("Posts saved to CSV file")
 

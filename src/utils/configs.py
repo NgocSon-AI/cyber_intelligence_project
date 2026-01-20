@@ -1,13 +1,26 @@
 import os
+from pathlib import Path
+
 
 class Config:
     """
     Configuration class for the cyber intelligence project.
 
     This class centralizes all configuration constants to avoid hard-coding
-    and improve maintainability. All values can be overridden via environment
+    và improve maintainability. All values can be overridden via environment
     variables or configuration files.
     """
+
+    # === DarkForums Site Configuration ===
+    class DarkForums:
+        """Configuration for DarkForums forum crawling."""
+        BASE_URL = os.getenv("DARKFORUMS_BASE_URL", "https://darkforums.io/Forum-Databases")
+        LISTING_LOAD_TIMEOUT = int(os.getenv("DARKFORUMS_LISTING_TIMEOUT", 15000))
+        THREAD_TABLE_SELECTOR = os.getenv("DARKFORUMS_THREAD_TABLE_SELECTOR", "table.forum-display__thread-list")
+        THREAD_LINK_SELECTOR = os.getenv("DARKFORUMS_THREAD_LINK_SELECTOR", "a[href^='Thread-']")
+        TITLE_SELECTOR = os.getenv("DARKFORUMS_TITLE_SELECTOR", "span.thread_title, h1")
+        CONTENT_SELECTOR = os.getenv("DARKFORUMS_CONTENT_SELECTOR", "div.post_body, div.post_content")
+        AUTHOR_SELECTOR = os.getenv("DARKFORUMS_AUTHOR_SELECTOR", "a.author, span.post_author")
 
     # === General Settings ===
     SCAN_INTERVAL_HOURS = int(os.getenv("SCAN_INTERVAL_HOURS", 3))
@@ -28,9 +41,17 @@ class Config:
     # === Telegram Bot Alert Settings ===
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
     TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")  # ID bạn muốn nhận thông báo
-
+    BASE_DIR = Path(__file__).resolve().parents[2]
     # === Crawler Settings ===
+    # data directory
+    DATA_DIR = BASE_DIR / "dataleak"
+    DATA_DIR.mkdir(exist_ok=True)
+
+    # file name (từ env)
     OUTPUT_FILE = os.getenv("OUTPUT_FILE", "leakbase_output.csv")
+
+    # full path
+    OUTPUT_PATH = DATA_DIR / OUTPUT_FILE
 
     # === LeakBase Site Configuration ===
     class LeakBase:
